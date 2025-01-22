@@ -1,0 +1,109 @@
+// Keywords: 
+
+initialize() {
+	defineConstant("id",format("%.0f",runif(1,1e6,1e7-1)));
+	genome_size = 5e7;	// try 1e6, 1e7, 5e7
+	mu_dfe = -0.001;	// try -0.05, -0.01, -0.001
+	recombo = 1e-8;	// try 1e-7, 1e-8, 1e-9
+
+	defineConstant("sizeName", genome_size);
+	initializeMutationRate(1e-7);
+	defineConstant("mdfeName", mu_dfe);
+	defineConstant("recomName", recombo);
+	initializeMutationType("m1", 0.5, "f", 0.0);         // neutral, non-coding, non-gene
+	initializeMutationType("m2", 0.5, "f", 0.0);         // synonymous
+	initializeMutationType("m3", 0.5, "g", mu_dfe, 0.2);  // non-syn deleterious
+	initializeMutationType("m4", 0.5, "g", mu_dfe, 0.2);  // cis reg deleterious
+	initializeMutationType("m5", 0.5, "f", 0.0);         // neutral, intron
+
+	initializeGenomicElementType("g1", c(m2,m3), c(2,8));  // exon
+	initializeGenomicElementType("g2", c(m5,m4), c(9,1));       // intron
+	initializeGenomicElementType("g3", c(m1), 1);           // non-coding
+	
+	// Generate random genes along a chromosome
+	base = 0;
+	
+	while (base < genome_size) {
+		// make a non-coding region
+		nc_length = rdunif(1, 100, 5000);
+		initializeGenomicElement(g3, base, base + nc_length - 1);
+		base = base + nc_length;
+		
+		// make first exon
+		ex_length = asInteger(rlnorm(1, log(50), log(2))) + 1;
+		initializeGenomicElement(g1, base, base + ex_length - 1);
+		base = base + ex_length;
+		
+		// make additional intron-exon pairs
+		do
+		{
+			in_length = asInteger(rlnorm(1, log(100), log(1.5))) + 10;
+			initializeGenomicElement(g2, base, base + in_length - 1);
+			base = base + in_length;
+			
+			ex_length = asInteger(rlnorm(1, log(50), log(2))) + 1;
+			initializeGenomicElement(g1, base, base + ex_length - 1);
+			base = base + ex_length;
+		}
+		while (runif(1) < 0.8);  // 20% probability of stopping
+	}
+	
+	// final non-coding region
+	nc_length = rdunif(1, 100, 5000);
+	initializeGenomicElement(g3, base, base + nc_length - 1);
+	
+	// single recombination rate
+	initializeRecombinationRate(recombo);
+}
+1 early() {
+subpopCount = 10;
+for (i in 1:subpopCount)
+	sim.addSubpop(i, 1000);
+for (i in 2:subpopCount)
+	sim.subpopulations[i-1].setMigrationRates(i-1, 5e-3); 
+for (i in 1:(subpopCount-1))
+	sim.subpopulations[i-1].setMigrationRates(i+1, 5e-3);
+for (i in 1:subpopCount)
+	sim.subpopulations[i-1].setSelfingRate(0.95); //selfing
+
+}
+
+
+
+
+ 2: late() {
+ 	    if((sim.cycle % 1e3)==0){
+    	print(sim.cycle);
+    	print(calcFST(p1.genomes, p2.genomes));
+    	print(calcFST(p1.genomes, p10.genomes));
+    	print(mdfeName);
+    	print(recomName);
+    	print(sizeName);
+
+    }
+
+   if(sim.cycle > (1e5 - 100)){
+  //  if(sim.cycle ==( 100)){
+
+		allIndividuals = sim.subpopulations.individuals;
+		sampledIndividuals = sample(allIndividuals, 2);
+		sampledIndividuals.genomes.output("~/Dropbox/jesse/Arabidopsis/HerbariumSeq/Results/SLiM/bgs_lasky2_stepping_biggenome_meanDel" + mdfeName + "_recom" + recomName + '_' + sizeName + '_' + sim.cycle + "_" + id + '.txt');
+
+    }
+    }
+
+
+
+
+1e5 late() {
+
+   sim.simulationFinished();
+}
+
+
+
+
+
+
+
+
